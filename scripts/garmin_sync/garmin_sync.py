@@ -38,8 +38,9 @@ DATA_DIR = Path(os.environ.get("DATA_DIR", "./data"))
 # On the very first run (no .last_sync file), fetch this many days back.
 INITIAL_LOOKBACK_DAYS = int(os.environ.get("INITIAL_LOOKBACK_DAYS", "30"))
 
-# Cloudflare Worker endpoint -- set to empty string to skip upload
-CF_WORKER_URL = os.environ.get("CF_WORKER_URL", "")
+# Cloudflare Worker base URL -- set to empty string to skip upload
+# e.g. https://lifts.yager.me  (no trailing slash, no /api/workouts)
+CF_WORKER_URL = os.environ.get("CF_WORKER_URL", "").rstrip("/")
 CF_API_KEY = os.environ.get("CF_API_KEY", "")
 
 # Stores the datetime of the last successful sync
@@ -129,7 +130,7 @@ def parse_strength(activity: dict, client: Garmin) -> dict | None:
         weight_g = ex_set.get("weight")
         set_entry = {
             "reps": ex_set.get("repetitionCount"),
-            "weight_lbs": round(weight_g * 0.00220462, 1) if weight_g is not None else None,
+            "weight_lbs": round(weight_g * 0.00220462 * 2) / 2 if weight_g is not None else None,
             # "duration_s": ex_set.get("duration"),
         }
 
@@ -269,35 +270,78 @@ def git_commit_and_push(changed_files: list[Path]) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Cloudflare Worker upload (stubbed)
+# Cloudflare Worker upload
 # ---------------------------------------------------------------------------
 
-def post_to_worker(appended: dict[str, list[dict]]) -> None:
-    """
-    POST new records to Cloudflare Worker.
+def strength_record_to_api_payload(record: dict) -> dict | None:
+    """Convert a parsed strength record to the WorkoutInputSchema shape."""
+    date = record["date"].split(" ")[0]  # "2025-01-01 10:00:00" -> "2025-01-01"
 
-    TODO: implement Worker endpoint at CF_WORKER_URL that:
-      - Accepts JSON body: {"type": "strength"|"runs"|..., "records": [...]}
-      - Validates CF_API_KEY from Authorization header
-      - Upserts records into D1 tables
-    """
+    lifts = []
+    for position, lift in enumerate(record.get("lifts", [])):
+        sets = []
+        for i, s in enumerate(lift["sets"]):
+            weight = s.get("weight_lbs") or 0
+            reps = s.get("reps") or 0
+            sets.append({
+                "set_number": i + 1,
+                "reps": int(reps),
+                "weight": max(0.0, float(weight)),
+            })
+        if not sets:
+            continue
+        lifts.append({
+            "lift_name": lift["exercise"],
+            "superset_id": None,
+            "position": position,
+            "sets": sets,
+        })
+
+    if not lifts:
+        return None
+
+    return {
+        "date": date,
+        "notes": record.get("notes") or "",
+        "lifts": lifts,
+    }
+
+
+def post_to_worker(appended: dict[str, list[dict]]) -> None:
+    """POST new strength workouts to the workout API at CF_WORKER_URL/api/workouts."""
     if not CF_WORKER_URL:
         print("Cloudflare: CF_WORKER_URL not set, skipping upload.")
         return
 
+    strength_records = appended.get("strength", [])
+    if not strength_records:
+        print("Cloudflare: no strength workouts to upload.")
+        return
+
+    url = f"{CF_WORKER_URL}/api/workouts"
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {CF_API_KEY}",
+        "Authorization": f"ApiKey {CF_API_KEY}",
     }
 
-    for file_key, records in appended.items():
-        payload = {"type": file_key, "records": records}
+    ok = 0
+    for record in strength_records:
+        payload = strength_record_to_api_payload(record)
+        if payload is None:
+            print(f"  Cloudflare: skipping strength record with no lifts ({record.get('date')})")
+            continue
         try:
-            resp = requests.post(CF_WORKER_URL, json=payload, headers=headers, timeout=30)
-            resp.raise_for_status()
-            print(f"  Cloudflare: posted {len(records)} {file_key} record(s) -> {resp.status_code}")
+            resp = requests.post(url, json=payload, headers=headers, timeout=30)
+            if resp.status_code in (200, 201):
+                workout_id = resp.json().get("id", "?")
+                print(f"  Cloudflare: uploaded {payload['date']} -> id={workout_id}")
+                ok += 1
+            else:
+                print(f"  Cloudflare: failed {payload['date']} ({resp.status_code}): {resp.text[:200]}")
         except requests.RequestException as e:
-            print(f"  Cloudflare: failed to post {file_key}: {e}")
+            print(f"  Cloudflare: error uploading {payload.get('date')}: {e}")
+
+    print(f"  Cloudflare: {ok}/{len(strength_records)} strength workout(s) uploaded.")
 
 
 # ---------------------------------------------------------------------------

@@ -1,0 +1,3 @@
+[submodule "services/workout-pwa"]
+	path = services/workout-pwa
+	url = https://github.com/ejyager00/workout-pwa
