@@ -12,6 +12,7 @@ Dependencies:
 Config via .env file (see .env.example) or environment variables.
 """
 
+import argparse
 import json
 import os
 import subprocess
@@ -393,5 +394,33 @@ def main() -> None:
     print(f"Done. Last sync updated to {sync_start.isoformat()}")
 
 
+def upload_since(since_date: str) -> None:
+    """Re-post strength records from local JSON files to the worker, filtered by date >= since_date."""
+    if not CF_WORKER_URL:
+        print("CF_WORKER_URL not set, skipping upload.")
+        return
+
+    path = DATA_DIR / "strength.json"
+    records = load_json_file(path)
+    filtered = [r for r in records if r.get("date", "") >= since_date]
+    if not filtered:
+        print(f"No strength records on or after {since_date}.")
+        return
+
+    print(f"Found {len(filtered)} strength record(s) on or after {since_date}.")
+    post_to_worker({"strength": filtered})
+
+
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--upload-since",
+        metavar="YYYY-MM-DD",
+        help="Re-post strength records from local JSON on or after this date (skips Garmin fetch)",
+    )
+    args = parser.parse_args()
+
+    if args.upload_since:
+        upload_since(args.upload_since)
+    else:
+        main()
