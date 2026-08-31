@@ -57,5 +57,22 @@
     "WEIGHTED_SIT_UP": "weighted sit up",
     "WEIGHTED_STANDING_ADDUCTION": "machine hip adduction",
     "WEIGHTED_STANDING_HIP_ABDUCTION": "machine hip abduction",
-    "_3_WAY_WEIGHTED_CALF_RAISE": "leg press calf raise"
+    "_3_WAY_WEIGHTED_CALF_RAISE": "leg press calf raise",
+    "BARBELL_BACK_SQUAT": "barbell back squat",
+    "BARBELL_DEADLIFT": "barbell deadlift",
+    "WIDE_GRIP_SEATED_CABLE_ROW": "wide grip seated cable row",
+    "CABLE_ROW_STANDING": "standing cable row",
+    "BAND_GOOD_MORNING": "cable good morning",
+    "INCLINE_DUMBBELL_FLYE": "incline dumbbell fly",
+    "CABLE_CRUNCH": "cable crunch",
+    "HIP_RAISE": "hip raise",
+    "TRICEPS_PRESSDOWN": "tricep press down",
+    "ALTERNATING_DUMBBELL_ROW": "single-arm dumbbell row",
+    "WEIGHTED_HIP_RAISE": "glute bridge",
+    "GOBLET_SQUAT": "goblet squat",
+    "SEATED_DUMBBELL_SHOULDER_PRESS": "seated dumbbell shoulder press",
+    "KNEELING_CABLE_CRUNCH": "kneeling cable crunch",
+    "DUMBBELL_BULGARIAN_SPLIT_SQUAT": "dumbbell bulgarian split squat",
+    "DUMBBELL_SIDE_LUNGE": "dumbbell side lunge",
+    "BARBELL_BICEPS_CURL": "barbell biceps curl"
 }
